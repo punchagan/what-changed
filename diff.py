@@ -2,8 +2,10 @@
 
 from __future__ import absolute_import, print_function
 
-import ast
+# 3rd party library
+import astroid
 
+# Local library
 from util import dotted_getattr, is_public, parse_file
 
 class Diff(object):
@@ -75,7 +77,8 @@ class ClassDiff(Diff):
         diff = {}
         interested_in = {
             'bases': 'bases',
-            'decorator_list': 'decorator_list',
+            ## FIXME: do we really need this?
+            'decorators': 'decorators',
         }
 
         for name, attr in interested_in.iteritems():
@@ -95,7 +98,7 @@ class ClassDiff(Diff):
         functions = {
             node.name: node for node in klass
 
-            if isinstance(node, ast.FunctionDef) and
+            if isinstance(node, astroid.Function) and
             (is_public(node) or node.name in set(['__init__', '__call__']))
         }
 
@@ -137,7 +140,8 @@ class FunctionDiff(Diff):
             'defaults': 'args.defaults',
             'vararg': 'args.vararg',
             'kwarg': 'args.kwarg',
-            'decorator_list': 'decorator_list',
+            ## FIXME: do we really need this?
+            'decorators': 'decorators',
         }
 
         for name, attr in interesting_properties.iteritems():
@@ -157,7 +161,7 @@ class FunctionDiff(Diff):
         assert version in ('old', 'new')
         f = getattr(self, version, None)
 
-        argnames = [arg.id for arg in f.args.args]
+        argnames = [arg.name for arg in f.args.args]
         n = len(argnames)
         d = len(f.args.defaults)
 
@@ -177,10 +181,17 @@ class FunctionDiff(Diff):
 
 class ModuleDiff(Diff):
 
+    def __init__(self, old, new):
+        """Constructor. """
+
+        super(ModuleDiff, self).__init__(old, new)
+        ## FIXME: We should allow class names to change, may be...
+        self.name = self.old.name if old is not None else self.new.name
+
     @classmethod
     def compute_diff(cls, old, new):
-        diff = cls._diff_functions(old, new)
-        d2 = cls._diff_classes(old, new)
+        diff = cls._diff_functions(old.body, new.body)
+        d2 = cls._diff_classes(old.body, new.body)
         diff.update(d2)
         return diff
 
@@ -188,7 +199,7 @@ class ModuleDiff(Diff):
     def interesting_functions(module):
         functions = {
             node.name: node for node in module
-            if isinstance(node, ast.FunctionDef) and is_public(node)
+            if isinstance(node, astroid.Function) and is_public(node)
         }
 
         return functions
@@ -198,7 +209,7 @@ class ModuleDiff(Diff):
     def _get_public_classes(cls, module):
         public_classes = {
             node.name: node for node in module
-            if isinstance(node, ast.ClassDef) and is_public(node)
+            if isinstance(node, astroid.Class) and is_public(node)
         }
         return public_classes
 
@@ -245,7 +256,7 @@ class ModuleDiff(Diff):
 
 
 def diff_files(old, new):
-    return ModuleDiff(parse_file(old).body, parse_file(new).body)
+    return ModuleDiff(parse_file(old), parse_file(new))
 
 
 def diff_functions(old, new):
@@ -273,10 +284,10 @@ def compare(a, b):
                 if not compare(item, b[i]):
                     return (a, b)
 
-    elif isinstance(a, ast.Name):
-        return a.id == b.id
+    elif isinstance(a, astroid.Name):
+        return a.name == b.name
 
-    elif isinstance(a, ast.Attribute):
-        return a.attr == b.attr and a.value.id == b.value.id
+    # elif isinstance(a, ast.Attribute):
+    #     return a.attr == b.attr and a.value.id == b.value.id
 
     return None

@@ -1,7 +1,9 @@
-import ast
+# Standard library
 import unittest
 
+# Local library
 from diff import diff_classes, diff_functions
+from util import parse_string
 
 
 class TestFunctionDiff(unittest.TestCase):
@@ -75,8 +77,7 @@ class TestFunctionDiff(unittest.TestCase):
 
         # Then
         self.assertIsNotNone(diff)
-        # FIXME: Also have a test for asserting that everything else is None!
-        self.assertEqual(2, len(diff.decorator_list))
+        self.assertEqual(2, len(diff.decorators))
 
     def _get_foo(self, args=None, decorator_list=None):
         decorators = '\n'.join('@%s' % deco for deco in decorator_list or [])
@@ -85,7 +86,7 @@ class TestFunctionDiff(unittest.TestCase):
             'decorators': decorators
          }
 
-        return ast.parse(code).body[0]
+        return parse_string(code).body[0]
 
 
 
@@ -124,7 +125,7 @@ class TestClassDiff(unittest.TestCase):
 
         # Then
         self.assertIsNotNone(diff)
-        self.assertEqual(2, len(diff.decorator_list))
+        self.assertEqual(2, len(diff.decorators))
 
     def test_should_detect_change_in_constructor(self):
         # Given
@@ -143,7 +144,7 @@ class TestClassDiff(unittest.TestCase):
             bases = ['object']
         decorators = '\n'.join('@%s' % deco for deco in decorator_list or [])
         code = """%s\nclass A(%s):\n    pass""" % (decorators, ', '.join(bases))
-        return ast.parse(code).body[0]
+        return parse_string(code).body[0]
 
     def _get_A_(self):
         code = """
@@ -153,18 +154,25 @@ class TestClassDiff(unittest.TestCase):
         """
         import textwrap
         code = textwrap.dedent(code)
-        return ast.parse(code).body[0]
+        return parse_string(code).body[0]
 
     def _get_method(self, name, args=None, decorator_list=None):
         args = args or ['self']
         decorators = '\n'.join('@%s' % deco for deco in decorator_list or [])
+        deco_code = "def %s(): pass"
+        extra_code = '\n'.join(deco_code % deco for deco in decorator_list or [])
+
         code = """%(decorators)s\ndef %(name)s(%(args)s):\n    return""" % {
             'args': ', '.join(args or []),
             'decorators': decorators,
             'name': name
          }
+        code = '%s\n%s' % (extra_code, code)
 
         return code.replace('\n', '\n' + 4 * ' ')
+
+
+## FIXME: Add tests for module diffs...
 
 
 if __name__ == '__main__':

@@ -1,6 +1,5 @@
-# Standard library
-import ast
-from os.path import basename
+# 3rd-party library
+from astroid.builder import AstroidBuilder
 
 def dotted_getattr(obj, attribute):
     attributes = attribute.split('.')
@@ -19,6 +18,7 @@ def is_py_file(filename):
 
 
 def parse_file(path):
-    with open(path) as f:
-        source = f.read()
-    return ast.parse(source, basename(path))
+    return AstroidBuilder().file_build(path)
+
+def parse_string(code):
+    return AstroidBuilder().string_build(code)
