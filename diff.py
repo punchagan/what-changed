@@ -33,6 +33,83 @@ class Diff(object):
         self.old = old
         self.new = new
 
+    @classmethod
+    def compute_diff(cls, old, new):
+        raise NotImplementedError
+
+    @classmethod
+    def _diff_functions(cls, old, new):
+        diff = {}
+
+        old_functions = cls.interesting_functions(old)
+        new_functions = cls.interesting_functions(new)
+
+        old_names = set(old_functions.keys())
+        new_names = set(new_functions.keys())
+
+        removed_functions = old_names - new_names
+        added_functions = new_names - old_names
+
+        diff['removed_functions'] = removed_functions
+        diff['added_functions'] = added_functions
+        changed_functions = diff.setdefault('changed_functions', {})
+
+        for name in (old_names & new_names):
+            function_diff = diff_functions(old_functions[name], new_functions[name])
+            if function_diff is not None:
+                changed_functions['name'] = function_diff
+
+        return diff
+
+
+class ClassDiff(Diff):
+
+    @classmethod
+    def compute_diff(cls, old, new):
+        diff = {}
+        interested_in = {
+            'bases': 'bases',
+            'decorator_list': 'decorator_list',
+        }
+
+        for name, attr in interested_in.iteritems():
+            a = dotted_getattr(old, attr)
+            b = dotted_getattr(new, attr)
+            diff[name] = compare(a, b)
+
+        diff.update(cls._diff_functions(old.body, new.body))
+
+        return diff
+
+    @classmethod
+    def interesting_functions(cls, klass):
+        functions = {
+            node.name: node for node in klass
+
+            if isinstance(node, ast.FunctionDef) and
+            (is_public(node) or node.name in set(['__init__', '__call__']))
+        }
+
+        return functions
+
+    def __repr__(self):
+        text = ''
+
+        if self.removed_functions:
+            text += 'Removed functions:\n' + repr(self.removed_functions) + '\n'
+
+        if self.added_functions:
+            text += 'Added functions:\n' + repr(self.added_functions) + '\n'
+
+        if self.changed_functions:
+            text += 'Changed functions:\n'
+            for _, function in self.changed_functions.iteritems():
+                text += repr(function)
+
+            text += '\n'
+
+        return text
+
 
 class FunctionDiff(Diff):
 
@@ -44,8 +121,8 @@ class FunctionDiff(Diff):
         assert old.name == new.name
         self.name = old.name
 
-    @staticmethod
-    def compute_diff(old, new):
+    @classmethod
+    def compute_diff(cls, old, new):
         ## FIXME: allow one of old or new to be None.
         diff = {}
 
@@ -94,32 +171,12 @@ class FunctionDiff(Diff):
 
 class ModuleDiff(Diff):
 
-    @staticmethod
-    def compute_diff(old, new):
-        diff = {}
-
-        old_functions = ModuleDiff.public_functions(old)
-        new_functions = ModuleDiff.public_functions(new)
-
-        old_names = set(old_functions.keys())
-        new_names = set(new_functions.keys())
-
-        removed_functions = old_names - new_names
-        added_functions = new_names - old_names
-
-        diff['removed_functions'] = removed_functions
-        diff['added_functions'] = added_functions
-        changed_functions = diff.setdefault('changed_functions', {})
-
-        for name in (old_names & new_names):
-            function_diff = diff_functions(old_functions[name], new_functions[name])
-            if function_diff is not None:
-                changed_functions['name'] = function_diff
-
-        return diff
+    @classmethod
+    def compute_diff(cls, old, new):
+        return cls._diff_functions(old, new)
 
     @staticmethod
-    def public_functions(module):
+    def interesting_functions(module):
         functions = {
             node.name: node for node in module
             if isinstance(node, ast.FunctionDef) and is_public(node)
@@ -153,6 +210,10 @@ def diff_files(old, new):
 
 def diff_functions(old, new):
     return FunctionDiff(old, new)
+
+
+def diff_classes(old, new):
+    return ClassDiff(old, new)
 
 
 def compare(a, b):

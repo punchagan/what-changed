@@ -1,7 +1,7 @@
 import ast
 import unittest
 
-from diff import diff_functions
+from diff import diff_classes, diff_functions
 
 
 class TestFunctionDiff(unittest.TestCase):
@@ -79,19 +79,93 @@ class TestFunctionDiff(unittest.TestCase):
         self.assertEqual(2, len(diff.decorator_list))
 
     def _get_foo(self, args=None, decorator_list=None):
-        if decorator_list:
-            decorators = '\n'.join('@%s' % deco for deco in decorator_list)
-
-        else:
-            decorators = ''
-
-        code = """def foo(%(args)s):\n    return"""
-        if args is None:
-            args = []
-        code = code % {'args': ', '.join(args)}
-        code = '%s\n%s' % (decorators, code)
+        decorators = '\n'.join('@%s' % deco for deco in decorator_list or [])
+        code = """%(decorators)s\ndef foo(%(args)s):\n    return""" % {
+            'args': ', '.join(args or []),
+            'decorators': decorators
+         }
 
         return ast.parse(code).body[0]
+
+
+
+class TestClassDiff(unittest.TestCase):
+
+    def test_should_detect_equal_classes(self):
+        # Given
+        foo = self._get_A()
+        bar = self._get_A()
+
+        # When
+        diff = diff_classes(foo, bar)
+
+        # Then
+        self.assertIsNone(diff)
+
+    def test_should_detect_change_in_bases(self):
+        # Given
+        foo = self._get_A()
+        bar = self._get_A(['a'])
+
+        # When
+        diff = diff_classes(foo, bar)
+
+        # Then
+        self.assertIsNotNone(diff)
+        self.assertEqual(2, len(diff.bases))
+
+    def test_should_detect_change_in_decorators(self):
+        # Given
+        foo = self._get_A(decorator_list=['bar'])
+        bar = self._get_A()
+
+        # When
+        diff = diff_classes(foo, bar)
+
+        # Then
+        self.assertIsNotNone(diff)
+        self.assertEqual(2, len(diff.decorator_list))
+
+    def test_should_detect_change_in_constructor(self):
+        # Given
+        foo = self._get_A()
+        bar = self._get_A_()
+
+        # When
+        diff = diff_classes(foo, bar)
+
+        # Then
+        self.assertIsNotNone(diff)
+        self.assertEqual(1, len(diff.added_functions))
+
+    def _get_A(self, bases=None, args=None, decorator_list=None):
+        if bases is None:
+            bases = ['object']
+        decorators = '\n'.join('@%s' % deco for deco in decorator_list or [])
+        code = """%s\nclass A(%s):\n    pass""" % (decorators, ', '.join(bases))
+        return ast.parse(code).body[0]
+
+    def _get_A_(self):
+        code = """
+        class A(object):
+            def __init__(*args, **kwargs):
+                pass
+        """
+        import textwrap
+        code = textwrap.dedent(code)
+        return ast.parse(code).body[0]
+
+    def _get_method(self, name, args=None, decorator_list=None):
+        args = args or ['self']
+        decorators = '\n'.join('@%s' % deco for deco in decorator_list or [])
+        code = """%(decorators)s\ndef %(name)s(%(args)s):\n    return""" % {
+            'args': ', '.join(args or []),
+            'decorators': decorators,
+            'name': name
+         }
+
+        return code.replace('\n', '\n' + 4 * ' ')
+
 
 if __name__ == '__main__':
     unittest.main()
