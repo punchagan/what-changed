@@ -47,17 +47,14 @@ class Diff(object):
         old_names = set(old_functions.keys())
         new_names = set(new_functions.keys())
 
-        removed_functions = old_names - new_names
-        added_functions = new_names - old_names
-
-        diff['removed_functions'] = removed_functions
-        diff['added_functions'] = added_functions
         changed_functions = diff.setdefault('changed_functions', {})
 
-        for name in (old_names & new_names):
-            function_diff = diff_functions(old_functions[name], new_functions[name])
+        for name in (old_names | new_names):
+            function_diff = diff_functions(
+                old_functions.get(name, None), new_functions.get(name, None)
+            )
             if function_diff is not None:
-                changed_functions['name'] = function_diff
+                changed_functions[name] = function_diff
 
         return diff
 
@@ -73,8 +70,8 @@ class ClassDiff(Diff):
         }
 
         for name, attr in interested_in.iteritems():
-            a = dotted_getattr(old, attr)
-            b = dotted_getattr(new, attr)
+            a = dotted_getattr(old, attr) if old is not None else None
+            b = dotted_getattr(new, attr) if new is not None else None
             diff[name] = compare(a, b)
 
         diff.update(cls._diff_functions(old.body, new.body))
@@ -95,14 +92,7 @@ class ClassDiff(Diff):
     def __repr__(self):
         text = ''
 
-        if self.removed_functions:
-            text += 'Removed functions:\n' + repr(self.removed_functions) + '\n'
-
-        if self.added_functions:
-            text += 'Added functions:\n' + repr(self.added_functions) + '\n'
-
         if self.changed_functions:
-            text += 'Changed functions:\n'
             for _, function in self.changed_functions.iteritems():
                 text += repr(function)
 
@@ -117,9 +107,11 @@ class FunctionDiff(Diff):
         """Constructor."""
 
         super(FunctionDiff, self).__init__(old, new)
-        ## FIXME: We should allow function names to change, may be...
-        assert old.name == new.name
-        self.name = old.name
+        if not (old is None or new is None):
+            ## FIXME: We should allow function names to change, may be...
+            assert old.name == new.name
+
+        self.name = old.name if old is not None else new.name
 
     @classmethod
     def compute_diff(cls, old, new):
@@ -135,21 +127,21 @@ class FunctionDiff(Diff):
         }
 
         for name, attr in interesting_properties.iteritems():
-            a = dotted_getattr(old, attr)
-            b = dotted_getattr(new, attr)
+            a = dotted_getattr(old, attr) if old is not None else None
+            b = dotted_getattr(new, attr) if new is not None else None
             diff[name] = compare(a, b)
 
         return diff
 
     def __repr__(self):
-        old = '- ' + self._get_signature('old')
-        new = '+ ' + self._get_signature('new')
-        text = "%s\n%s\n" % (old, new)
+        old = '- %s\n' % self._get_signature('old') if self.old is not None else ''
+        new = '+ %s\n' % self._get_signature('new') if self.new is not None else ''
+        text = "%s%s\n" % (old, new)
         return text
 
     def _get_signature(self, version):
         assert version in ('old', 'new')
-        f = getattr(self, version)
+        f = getattr(self, version, None)
 
         argnames = [arg.id for arg in f.args.args]
         n = len(argnames)
@@ -187,13 +179,7 @@ class ModuleDiff(Diff):
 
     def __repr__(self):
         text = ''
-
-        if self.removed_functions:
-            text += 'Removed functions:\n' + repr(self.removed_functions) + '\n'
-
-        if self.added_functions:
-            text += 'Added functions:\n' + repr(self.added_functions) + '\n'
-
+        ## FIXME: Should print the module's name ...
         if self.changed_functions:
             text += 'Changed functions:\n'
             for _, function in self.changed_functions.iteritems():

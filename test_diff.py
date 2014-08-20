@@ -136,7 +136,7 @@ class TestClassDiff(unittest.TestCase):
 
         # Then
         self.assertIsNotNone(diff)
-        self.assertEqual(1, len(diff.added_functions))
+        self.assertEqual(1, len(diff.changed_functions))
 
     def _get_A(self, bases=None, args=None, decorator_list=None):
         if bases is None:
