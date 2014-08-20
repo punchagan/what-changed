@@ -148,7 +148,7 @@ class TestClassDiff(unittest.TestCase):
     def _get_A_(self):
         code = """
         class A(object):
-            def __init__(*args, **kwargs):
+            def __init__(self, *args, **kwargs):
                 pass
         """
         import textwrap

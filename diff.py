@@ -37,12 +37,14 @@ class Diff(object):
     def compute_diff(cls, old, new):
         raise NotImplementedError
 
+    ## FIXME: This should really be a part of a "function collection" kind of a
+    ## class, not the diff class.
     @classmethod
     def _diff_functions(cls, old, new):
         diff = {}
 
-        old_functions = cls.interesting_functions(old)
-        new_functions = cls.interesting_functions(new)
+        old_functions = cls.interesting_functions(old) if old is not None else {}
+        new_functions = cls.interesting_functions(new) if new is not None else {}
 
         old_names = set(old_functions.keys())
         new_names = set(new_functions.keys())
@@ -61,6 +63,13 @@ class Diff(object):
 
 class ClassDiff(Diff):
 
+    def __init__(self, old, new):
+        """Constructor. """
+
+        super(ClassDiff, self).__init__(old, new)
+        ## FIXME: We should allow class names to change, may be...
+        self.name = self.old.name if old is not None else self.new.name
+
     @classmethod
     def compute_diff(cls, old, new):
         diff = {}
@@ -74,7 +83,10 @@ class ClassDiff(Diff):
             b = dotted_getattr(new, attr) if new is not None else None
             diff[name] = compare(a, b)
 
-        diff.update(cls._diff_functions(old.body, new.body))
+        o = old.body if old is not None else None
+        n = new.body if new is not None else None
+
+        diff.update(cls._diff_functions(o, n))
 
         return diff
 
@@ -90,15 +102,17 @@ class ClassDiff(Diff):
         return functions
 
     def __repr__(self):
-        text = ''
+        ## FIXME: bases, when no diff
+        text = 'class %s:\n' % self.name
 
+        ## FIXME: duplicated in modules repr...
         if self.changed_functions:
             for _, function in self.changed_functions.iteritems():
                 text += repr(function)
 
             text += '\n'
 
-        return text
+        return text.replace('\n', '\n' + 4 * ' ').strip()
 
 
 class FunctionDiff(Diff):
@@ -165,7 +179,10 @@ class ModuleDiff(Diff):
 
     @classmethod
     def compute_diff(cls, old, new):
-        return cls._diff_functions(old, new)
+        diff = cls._diff_functions(old, new)
+        d2 = cls._diff_classes(old, new)
+        diff.update(d2)
+        return diff
 
     @staticmethod
     def interesting_functions(module):
@@ -177,6 +194,36 @@ class ModuleDiff(Diff):
         return functions
 
 
+    @classmethod
+    def _get_public_classes(cls, module):
+        public_classes = {
+            node.name: node for node in module
+            if isinstance(node, ast.ClassDef) and is_public(node)
+        }
+        return public_classes
+
+
+    @classmethod
+    def _diff_classes(cls, old, new):
+        diff = {}
+
+        old_classes = cls._get_public_classes(old)
+        new_classes = cls._get_public_classes(new)
+
+        old_names = set(old_classes.keys())
+        new_names = set(new_classes.keys())
+
+        changed_classes = diff.setdefault('changed_classes', {})
+
+        for name in (old_names | new_names):
+            class_diff = diff_classes(
+                old_classes.get(name, None), new_classes.get(name, None)
+            )
+            if class_diff is not None:
+                changed_classes[name] = class_diff
+
+        return diff
+
     def __repr__(self):
         text = ''
         ## FIXME: Should print the module's name ...
@@ -184,6 +231,13 @@ class ModuleDiff(Diff):
             text += 'Changed functions:\n'
             for _, function in self.changed_functions.iteritems():
                 text += repr(function)
+
+            text += '\n'
+
+        if self.changed_classes:
+            text += 'Changed classes:\n'
+            for _, klass in self.changed_classes.iteritems():
+                text += repr(klass)
 
             text += '\n'
 
