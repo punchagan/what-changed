@@ -105,8 +105,25 @@ class ClassDiff(Diff):
         return functions
 
     def __repr__(self):
-        ## FIXME: bases, when no diff
-        text = 'class %s:\n' % self.name
+        text = ''
+
+        if self.bases:
+            old_bases, new_bases = self.bases
+            if self.old is not None:
+                text += '- class %s(%s):\n' % (
+                    self.old.name,
+                    ', '.join([b.as_string() for b in old_bases or []])
+                )
+
+            if self.new is not None:
+                text += '+ class %s(%s):\n' % (
+                    self.new.name,
+                    ', '.join([b.as_string() for b in new_bases or []])
+                )
+
+        else:
+            bases = self.old.basenames
+            text += 'class %s(%s):\n' % (self.name, ', '.join(bases or []))
 
         ## FIXME: duplicated in modules repr...
         if self.changed_functions:
@@ -115,9 +132,10 @@ class ClassDiff(Diff):
 
             text += '\n'
 
+        text = text.replace('\n', '\n' + 4 * ' ').strip()
         text += '\n'
 
-        return text.replace('\n', '\n' + 4 * ' ').strip()
+        return text
 
 
 class FunctionDiff(Diff):
