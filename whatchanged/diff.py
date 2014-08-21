@@ -6,7 +6,7 @@ from __future__ import absolute_import, print_function
 import astroid
 
 # Local library
-from util import dotted_getattr, is_public, parse_file
+from .util import dotted_getattr, is_public, parse_file
 
 class Diff(object):
 

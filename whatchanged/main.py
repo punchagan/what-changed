@@ -7,8 +7,8 @@ from os import walk
 from os.path import exists, isdir, join
 
 # Local library
-from util import is_py_file
-from diff import diff_files
+from .util import is_py_file
+from .diff import diff_files
 
 
 def main():

@@ -2,8 +2,8 @@
 import unittest
 
 # Local library
-from diff import diff_classes, diff_functions
-from util import parse_string
+from whatchanged.diff import diff_classes, diff_functions
+from whatchanged.util import parse_string
 
 
 class TestFunctionDiff(unittest.TestCase):
