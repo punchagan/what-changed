@@ -14,8 +14,8 @@ from .diff import diff_files
 def main():
     import sys
 
-    if sys.argv < 3:
-        print('Usage: %s <module1> <module2>' % sys.argv[0])
+    if len(sys.argv) < 3:
+        print('Usage: %s <package1/module1> <package2/module2>' % sys.argv[0])
         sys.exit(1)
 
     old, new = sys.argv[1:3]
