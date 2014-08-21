@@ -115,6 +115,8 @@ class ClassDiff(Diff):
 
             text += '\n'
 
+        text += '\n'
+
         return text.replace('\n', '\n' + 4 * ' ').strip()
 
 
@@ -165,9 +167,17 @@ class FunctionDiff(Diff):
         n = len(argnames)
         d = len(f.args.defaults)
 
+        def to_string(el):
+            return el if isinstance(el, basestring) else el.as_string()
+
         argnames = [
-            name if i < (n - d) else '%s=%s' % (name, f.args.defaults[i-n])
+            to_string(name)
+
+            if i < (n - d)
+            else '%s=%s' % (to_string(name), to_string(f.args.defaults[i-n]))
+
             for i, name in enumerate(argnames)
+
         ]
 
         if f.args.vararg is not None:
@@ -236,21 +246,28 @@ class ModuleDiff(Diff):
         return diff
 
     def __repr__(self):
+        # FIXME: make this all into a template!
+
         text = ''
-        ## FIXME: Should print the module's name ...
+        if self.old is not None:
+            text += '- %s\n' % self.old.file
+        if self.new is not None:
+            text += '+ %s\n' % self.new.file
+        text += '\n'
+
         if self.changed_functions:
-            text += 'Changed functions:\n'
+            text += '\n'
             for _, function in self.changed_functions.iteritems():
                 text += repr(function)
-
             text += '\n'
 
         if self.changed_classes:
-            text += 'Changed classes:\n'
+            text += '\n'
             for _, klass in self.changed_classes.iteritems():
                 text += repr(klass)
-
             text += '\n'
+
+        text += '\n'
 
         return text
 
@@ -273,21 +290,20 @@ def compare(a, b):
     if type(a) != type(b):
         return (a, b)
 
+    elif isinstance(a, basestring):
+        return None if a == b else (a, b)
+
     elif isinstance(a, list):
         if len(a) != len(b):
             return (a, b)
 
         else:
             for i, item in enumerate(a):
-                ## FIXME: This function's API is totally unclear... It's
-                ## surprising that it kinda works, at all!
-                if not compare(item, b[i]):
+                if compare(item, b[i]) is not None:
                     return (a, b)
 
-    elif isinstance(a, astroid.Name):
-        return a.name == b.name
-
-    # elif isinstance(a, ast.Attribute):
-    #     return a.attr == b.attr and a.value.id == b.value.id
+    elif hasattr(a, 'as_string') and hasattr(b, 'as_string'):
+        a, b = a.as_string(), b.as_string()
+        return None if a == b else (a, b)
 
     return None
